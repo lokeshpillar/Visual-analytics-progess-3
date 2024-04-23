@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Passes Through Ranger-Stop1</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .bar:hover {
+            opacity: 0.8;
+        }
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: black;
+            shape-rendering: crispEdges;
+        }
+        .axis-label {
+            font: 12px sans-serif;
+        }
+        .bar-text {
+            fill: rgb(3, 3, 7);
+            font-size: 14px;
+            text-anchor: middle;
+        }
+    </style>
+</head>
+<body>
+    <h1>Unussual Activity Through Ranger-Stop1</h1>
+    <div>
+        <label for="carType">Choose a car type:</label>
+        <select id="carType">
+            <option value="all">All</option>
+            <!-- Options will be dynamically populated -->
+        </select>
+    </div>
+    <div id="chart"></div>
+    <script>
+        // Define SVG dimensions
+        const margin = {top: 20, right: 20, bottom: 50, left: 50},
+              width = 960 - margin.left - margin.right,
+              height = 500 - margin.top - margin.bottom;
+
+        // Create SVG element
+        const svg = d3.select("#chart")
+                      .append("svg")
+                      .attr("width", width + margin.left + margin.right)
+                      .attr("height", height + margin.top + margin.bottom)
+                      .append("g")
+                      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Load CSV data
+        d3.csv("Modified_Lekagul_Sensor_Data.csv").then(function(data) {
+            const countsByCarType = new Map();
+
+            // Process data
+            data.forEach(entry => {
+                const carType = entry['car-type'];
+                if (entry['gate-name'] === "ranger-stop1") {
+                    countsByCarType.set(carType, (countsByCarType.get(carType) || 0) + 1);
+                }
+            });
+
+            // Populate car type dropdown
+            const carTypes = Array.from(countsByCarType.keys());
+            d3.select("#carType").selectAll('option')
+                .data(carTypes, d => d)
+                .enter()
+                .append('option')
+                .text(d => d)
+                .attr('value', d => d);
+
+            // Color scale
+            const colorScale = d3.scaleOrdinal(d3.schemeCategory10)
+                                 .domain(carTypes);
+
+            function updateChart(selectedType) {
+                const data = selectedType === "all" ?
+                             Array.from(countsByCarType, ([type, count]) => ({type, count})) :
+                             [{type: selectedType, count: countsByCarType.get(selectedType) || 0}];
+
+                // Define scales
+                const xScale = d3.scaleBand()
+                                 .domain(data.map(d => d.type))
+                                 .range([0, width])
+                                 .padding(0.1);
+
+                const yScale = d3.scaleLinear()
+                                 .domain([0, d3.max(data, d => d.count)])
+                                 .range([height, 0]);
+
+                // Update bars
+                svg.selectAll(".bar").remove();
+                svg.selectAll(".bar-text").remove();
+                svg.selectAll(".bar")
+                    .data(data)
+                    .enter().append("rect")
+                    .attr("class", "bar")
+                    .attr("x", d => xScale(d.type))
+                    .attr("y", d => yScale(d.count))
+                    .attr("width", xScale.bandwidth())
+                    .attr("height", d => height - yScale(d.count))
+                    .attr("fill", d => colorScale(d.type));
+
+                // Add text labels to the bars
+                svg.selectAll(".bar-text")
+                    .data(data)
+                    .enter().append("text")
+                    .attr("class", "bar-text")
+                    .attr("x", d => xScale(d.type) + xScale.bandwidth() / 2)
+                    .attr("y", d => yScale(d.count) - 5)
+                    .text(d => d.count);
+
+                // Draw axes
+                svg.selectAll(".axis").remove();
+                svg.append("g")
+                   .attr("class", "x axis")
+                   .attr("transform", `translate(0,${height})`)
+                   .call(d3.axisBottom(xScale));
+                svg.append("g")
+                   .attr("class", "y axis")
+                   .call(d3.axisLeft(yScale));
+            }
+
+            // Initial chart display
+            updateChart("all");
+
+            // Dropdown change listener
+            d3.select("#carType").on("change", function() {
+                updateChart(this.value);
+            });
+        });
+    </script>
+</body>
+</html>
